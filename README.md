@@ -6,9 +6,12 @@ This project aims to create a language with strict static type checking while ke
 
 ## Status
 
-Current version: `v0.0.1`
+Current version: `v0.0.2`
 
-A minimal lexer has been implemented.
+A basic state-based lexer has been implemented.
 
-The lexer currently supports basic tokenization for numbers, words, and symbols.  
-Future development will include parsing, AST generation, type checking, and interpretation.
+The lexer currently supports tokenization for numbers, keywords, identifiers, symbols, and unknown characters. Identifiers may contain digits after the first character, and unsupported characters are emitted as `UNKNOWN` tokens.
+
+The lexer also distinguishes reserved keywords from identifiers and uses typed token definitions with `Literal` and type aliases.
+
+Future development will include improved operator handling, parsing, AST generation, type checking, and interpretation.

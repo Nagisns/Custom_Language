@@ -1,49 +1,83 @@
+from typing import Literal
+
 source = "let x = 10 + 5"
 
 number = ""
 word = ""
 symbol = ""
+unknown = ""
 
-tokens = []
+KEYWORDS: set[str] = {"let"}
 
-def check_number(check: str) -> None:
+SYMBOLS: set[str] = {"+", "="}
 
-    global number
+TokenType = Literal[
+    "NUMBER",
+    "KEYWORD",
+    "IDENTIFIER",
+    "SYMBOL",
+    "UNKNOWN"
+]
 
-    if check.isdigit():
-        number += check
-    elif number.isdigit():
-        tokens.append(("NUMBER", number))
-        print("number ->", number)
-        number = ""
+Token = tuple[TokenType, str]
+tokens: list[Token] = []
 
-def check_word(check: str) -> None:
+def check_keyword(check: str) -> Literal["KEYWORD", "IDENTIFIER"]:
+    if check in KEYWORDS:
+        return "KEYWORD"
 
-    global word
+    return "IDENTIFIER"
 
-    if check.isalpha():
-        word += check
-    elif word.isalpha():
-        tokens.append(("WORD", word))
-        print("word ->", word)
-        word = ""
+def lexer(check: str) -> None:
+    
+    global number, word, symbol, unknown
+    source_memory: str = check
 
-def check_symbol(check: str) -> None:
-
-    global symbol
-
-    if check in {"=", "+"}:
-        symbol += check
-    elif symbol != "":
-        tokens.append(("SYMBOL", symbol))
-        print("symbol ->" , symbol) 
-        symbol = ""
+    while source_memory:
+        if word != "":
+            if check.isalnum():
+                word += check
+                source_memory = ""
+            else:
+                token_type: Literal["KEYWORD", "IDENTIFIER"] = check_keyword(word)
+                tokens.append((token_type, word))
+                word = ""
+        elif number != "":
+            if check.isdigit():
+                number += check
+                source_memory = ""
+            else:
+                tokens.append(("NUMBER", number))
+                number = ""
+        elif symbol != "":
+            if check in SYMBOLS:
+                symbol += check
+                source_memory = ""
+            else:
+                tokens.append(("SYMBOL", symbol))
+                symbol = ""
+        else:
+            if check.isalpha():
+                word += check
+                source_memory = ""
+            elif check.isdigit():
+                number += check
+                source_memory = ""
+            elif check in SYMBOLS:
+                symbol += check
+                source_memory = ""
+            else:
+                if check == " ":
+                    source_memory = ""
+                else:
+                    unknown += check
+                    tokens.append(("UNKNOWN", unknown))
+                    unknown = ""
+                    source_memory = ""
 
 for char in source:
 
-    check_number(char)
-    check_word(char)
-    check_symbol(char)
+    lexer(char)
     
     if char.isdigit():
         print(char, "-> number")
@@ -59,8 +93,11 @@ if number != "":
     print("number ->", number)
 
 if word != "":
-    tokens.append(("WORD", word))
+    token_type = check_keyword(word)
+    tokens.append((token_type, word))
+
     print("word ->", word)
+    word = ""
 
 if symbol != "":
     tokens.append(("SYMBOL", symbol))
