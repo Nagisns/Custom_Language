@@ -1,0 +1,165 @@
+from typing import Literal
+
+TokenType = Literal[
+    "NUMBER",
+    "KEYWORD",
+    "IDENTIFIER",
+    "SYMBOL",
+    "UNKNOWN",
+]
+
+KEYWORDS: set[str] = {"let"}
+SYMBOLS: set[str] = {"+", "="}
+
+Token = tuple[TokenType, str]
+
+class Lexer:
+    
+    """
+    Tokenizes source code one character at a time.
+
+    The lexer keeps track of the current token being built and classifies
+    source characters into numbers, keywords, identifiers, symbols, and
+    unknown tokens.
+
+    Token types:
+    ------------
+    * NUMBER
+        A sequence of numeric characters.
+
+    * KEYWORD
+        A reserved word defined in KEYWORDS.
+
+    * IDENTIFIER
+        A user-defined name that starts with a letter and may contain
+        letters or digits.
+
+    * SYMBOL
+        A supported symbol defined in SYMBOLS.
+
+    * UNKNOWN
+        A character that does not match any supported token type.
+
+    Attributes:
+    -----------
+    source_memory : str
+        Temporarily stores the current character until it has been fully
+        processed.
+
+    number : str
+        Stores the NUMBER token currently being built.
+
+    word : str
+        Stores the word currently being built before it is classified as
+        KEYWORD or IDENTIFIER.
+
+    symbol : str
+        Stores the SYMBOL token currently being built.
+
+    unknown : str
+        Temporarily stores an unsupported character.
+
+    tokens : list[Token]
+        Stores all completed tokens.
+
+    Methods:
+    --------
+    check_keyword(check)
+        Classifies a completed word as KEYWORD or IDENTIFIER.
+
+    process_char(check)
+        Processes one source character and updates the current lexer state.
+
+    finalize()
+        Finalizes any unfinished token remaining at the end of the source.
+    """
+        
+    def __init__(self) -> None:
+        self.source_memory: str = ""
+        self.number: str = ""
+        self.word: str = ""
+        self.symbol: str = ""
+        self.unknown: str = ""
+        self.tokens: list[Token] = []
+
+    @staticmethod
+    def check_keyword(check: str) -> Literal["KEYWORD", "IDENTIFIER"]:
+        if check in KEYWORDS:
+            return "KEYWORD"
+
+        return "IDENTIFIER"
+
+    def finalize(self) -> None:
+        if self.number != "":
+            self.tokens.append(("NUMBER", self.number))
+            self.number = ""
+
+        if self.word != "":
+            token_type = self.check_keyword(self.word)
+            self.tokens.append((token_type, self.word))
+            self.word = ""
+
+        if self.symbol != "":
+            self.tokens.append(("SYMBOL", self.symbol))
+            self.symbol = ""
+
+    def _process_word(self, check: str) -> None:
+        if check.isalnum():
+            self.word += check
+            self.source_memory = ""
+            return
+        
+        token_type: Literal["KEYWORD", "IDENTIFIER"] = self.check_keyword(self.word)
+        self.tokens.append((token_type, self.word))
+        self.word = ""
+
+    def _process_number(self, check: str) -> None:
+        if check.isdigit():
+            self.number += check
+            self.source_memory = ""
+            return
+        
+        self.tokens.append(("NUMBER", self.number))
+        self.number = ""
+
+    def _process_symbol(self, check: str) -> None:
+        if check in SYMBOLS:
+            self.symbol += check
+            self.source_memory = ""
+            return
+                
+        self.tokens.append(("SYMBOL", self.symbol))
+        self.symbol = ""
+
+    def process_char(self, check: str) -> None:
+        self.source_memory: str = check
+
+        while self.source_memory:
+            if self.word != "":
+                self._process_word(check)
+
+            elif self.number != "":
+                self._process_number(check)
+
+            elif self.symbol != "":
+                self._process_symbol(check)
+
+            else:
+                if check.isalpha():
+                    self.word += check
+                    self.source_memory = ""
+                elif check.isdigit():
+                    self.number += check
+                    self.source_memory = ""
+                elif check in SYMBOLS:
+                    self.symbol += check
+                    self.source_memory = ""
+                else:
+                    if check == " ":
+                        self.source_memory = ""
+                        return
+                    
+                    self.unknown += check
+                    self.tokens.append(("UNKNOWN", self.unknown))
+                    self.unknown = ""
+                    self.source_memory = ""

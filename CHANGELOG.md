@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.0.3] - 2026-10-06
+
+### Added
+
+- Added the `Lexer` class to manage lexer state and token generation.
+- Added `finalize()` to finalize unfinished tokens at the end of the source input.
+- Added `_process_word()`, `_process_number()`, and `_process_symbol()` internal methods to separate token processing logic.
+- Added a class docstring documenting supported token types, lexer state, and methods.
+- Added a `main()` function and `if __name__ == "__main__":` entry point.
+
+### Changed
+
+- Moved lexer state from global variables into `Lexer` instance attributes.
+- Moved generated token storage into `Lexer.tokens`.
+- Replaced the standalone `lexer()` function with the `Lexer.process_char()` method.
+- Separated the lexer implementation into `Lexer.py` and program execution into `main.py`.
+- Changed EOF token handling from module-level logic to the `Lexer.finalize()` method.
+- Refactored word, number, and symbol processing into dedicated internal methods to reduce nesting in `process_char()`.
+- Simplified `main.py` so it only creates a `Lexer`, processes the source input, finalizes remaining tokens, and prints the resulting token list.
+
+### Removed
+
+- Removed module-level lexer state variables and the global token list.
+- Removed the standalone `lexer()` function.
+- Removed module-level EOF token finalization logic.
+- Removed per-character debug output for numbers, letters, spaces, and symbols.
+- Removed token-finalization debug output such as `number ->`, `word ->`, and `symbol ->`.
+
 ## [0.0.2] - 2026-10-04
 
 ### Added
