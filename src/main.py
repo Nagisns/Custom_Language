@@ -1,3 +1,7 @@
+# Copyright (c) 2026 Nagi(Nagisns)
+# Licensed under the MIT License.
+# See the LICENSE file for details.
+
 from Lexer import Lexer
 
 source = "let x = 10 + 5"

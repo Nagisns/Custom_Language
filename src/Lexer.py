@@ -1,3 +1,7 @@
+# Copyright (c) 2026 Nagi(Nagisns)
+# Licensed under the MIT License.
+# See the LICENSE file for details.
+
 from typing import Literal
 
 TokenType = Literal[
@@ -5,22 +9,24 @@ TokenType = Literal[
     "KEYWORD",
     "IDENTIFIER",
     "SYMBOL",
+    "MULTI_SYMBOLS",
     "UNKNOWN",
 ]
 
 KEYWORDS: set[str] = {"let"}
-SYMBOLS: set[str] = {"+", "="}
+SYMBOLS: set[str] = {"+", "-", "*", "/", "=", "!"}
+MULTI_SYMBOLS: set[str] = {"==", "!=", "+=", "-=", "/=", "*="}
 
 Token = tuple[TokenType, str]
 
 class Lexer:
-    
+
     """
     Tokenizes source code one character at a time.
 
     The lexer keeps track of the current token being built and classifies
-    source characters into numbers, keywords, identifiers, symbols, and
-    unknown tokens.
+    source characters into numbers, keywords, identifiers, symbols,
+    multi-character symbols, and unknown tokens.
 
     Token types:
     ------------
@@ -35,7 +41,12 @@ class Lexer:
         letters or digits.
 
     * SYMBOL
-        A supported symbol defined in SYMBOLS.
+        A supported single-character symbol defined in SYMBOLS.
+        A symbol may be temporarily stored while the lexer checks whether
+        it forms a multi-character symbol with the next character.
+
+    * MULTI_SYMBOLS
+        A supported multi-character symbol defined in MULTI_SYMBOLS.
 
     * UNKNOWN
         A character that does not match any supported token type.
@@ -53,8 +64,9 @@ class Lexer:
         Stores the word currently being built before it is classified as
         KEYWORD or IDENTIFIER.
 
-    symbol : str
-        Stores the SYMBOL token currently being built.
+    symbols : str
+        Temporarily stores a symbol while checking whether it forms a
+        multi-character symbol with the next character.
 
     unknown : str
         Temporarily stores an unsupported character.
@@ -73,12 +85,12 @@ class Lexer:
     finalize()
         Finalizes any unfinished token remaining at the end of the source.
     """
-        
+
     def __init__(self) -> None:
         self.source_memory: str = ""
         self.number: str = ""
         self.word: str = ""
-        self.symbol: str = ""
+        self.symbols: str = ""
         self.unknown: str = ""
         self.tokens: list[Token] = []
 
@@ -99,9 +111,9 @@ class Lexer:
             self.tokens.append((token_type, self.word))
             self.word = ""
 
-        if self.symbol != "":
-            self.tokens.append(("SYMBOL", self.symbol))
-            self.symbol = ""
+        if self.symbols != "":
+            self.tokens.append(("SYMBOL", self.symbols))
+            self.symbols = ""
 
     def _process_word(self, check: str) -> None:
         if check.isalnum():
@@ -123,13 +135,21 @@ class Lexer:
         self.number = ""
 
     def _process_symbol(self, check: str) -> None:
-        if check in SYMBOLS:
-            self.symbol += check
+        if self.symbols == "":
+            self.symbols += check
             self.source_memory = ""
             return
-                
-        self.tokens.append(("SYMBOL", self.symbol))
-        self.symbol = ""
+
+        candidate = self.symbols + check
+
+        if candidate in MULTI_SYMBOLS:
+            self.tokens.append(("MULTI_SYMBOLS", candidate))
+            self.symbols = ""
+            self.source_memory = ""
+            return
+
+        self.tokens.append(("SYMBOL", self.symbols))
+        self.symbols = ""
 
     def process_char(self, check: str) -> None:
         self.source_memory: str = check
@@ -141,25 +161,25 @@ class Lexer:
             elif self.number != "":
                 self._process_number(check)
 
-            elif self.symbol != "":
+            elif check in SYMBOLS or self.symbols != "":
                 self._process_symbol(check)
 
             else:
                 if check.isalpha():
                     self.word += check
                     self.source_memory = ""
-                elif check.isdigit():
+                    return
+                
+                if check.isdigit():
                     self.number += check
                     self.source_memory = ""
-                elif check in SYMBOLS:
-                    self.symbol += check
+                    return
+                
+                if check == " ":
                     self.source_memory = ""
-                else:
-                    if check == " ":
-                        self.source_memory = ""
-                        return
+                    return
                     
-                    self.unknown += check
-                    self.tokens.append(("UNKNOWN", self.unknown))
-                    self.unknown = ""
-                    self.source_memory = ""
+                self.unknown += check
+                self.tokens.append(("UNKNOWN", self.unknown))
+                self.unknown = ""
+                self.source_memory = ""

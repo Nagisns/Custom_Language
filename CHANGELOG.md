@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.0.4] - 2026-10-08
+
+### Added
+
+- Added the `MULTI_SYMBOLS` token type for supported multi-character symbols.
+- Added the `MULTI_SYMBOLS` set with support for `==`, `!=`, `+=`, `-=`, `/=`, and `*=`.
+- Added `-`, `*`, `/`, and `!` to the supported `SYMBOLS` set.
+- Added copyright and MIT License notices to `Lexer.py`.
+
+### Changed
+
+- Changed symbol processing to temporarily store the first symbol while checking whether it forms a supported multi-character symbol with the next character.
+- Updated `_process_symbol()` to generate `MULTI_SYMBOLS` tokens when a valid two-character symbol is found.
+- Updated `_process_symbol()` so an invalid multi-character combination finalizes only the stored single-character symbol and leaves the current character available for reprocessing.
+- Updated `process_char()` to process a pending symbol even when the current character is not itself a supported symbol.
+- Renamed the internal `symbol` state to `symbols` to reflect its use in multi-character symbol processing.
+- Updated `finalize()` to finalize a remaining single-character symbol at the end of the source input.
+- Updated the `Lexer` class docstring to document multi-character symbols and the updated symbol state.
+
 ## [0.0.3] - 2026-10-06
 
 ### Added
