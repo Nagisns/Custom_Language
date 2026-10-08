@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.0.5] - 2026-10-08
+
+### Added
+
+- Added `LexerConfig.py` to manage lexer configuration values such as keywords, single-character symbols, and multi-character symbols.
+- Added `token_types.py` to store lexer-related type definitions, including `WordType`, `TokenType`, `Token`, and `ProcessResult`.
+
+### Changed
+
+- Refactored `Lexer` to receive a `LexerConfig` instance through its constructor instead of using configuration values defined directly in `Lexer.py`.
+- Updated keyword, symbol, and multi-character symbol checks to use values provided by `LexerConfig`.  
+- Updated `main.py` to create a `LexerConfig` instance and pass it to `Lexer`.
+- Changed `_check_keyword()` to use the lexer configuration and return the `WordType` type alias.
+- Improved type clarity by using `ProcessResult` for lexer processing methods.
+
 ## [0.0.4] - 2026-10-08
 
 ### Added
