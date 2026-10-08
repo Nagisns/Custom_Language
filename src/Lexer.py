@@ -3,9 +3,9 @@
 # See the LICENSE file for details.
 
 from LexerConfig import LexerConfig
+from Token import Token
 from token_types import (
-    Token, 
-    WordType,
+    TokenType,
     ProcessResult,
 )
 
@@ -17,6 +17,9 @@ class Lexer:
     The lexer keeps track of the current token being built and classifies
     source characters into numbers, keywords, identifiers, symbols,
     multi-character symbols, and unknown tokens.
+
+    The lexer also tracks the current line and column position in the source
+    and stores the starting column of each token when it is created.
 
     Token types:
     ------------
@@ -65,13 +68,23 @@ class Lexer:
     unknown : str
         Temporarily stores an unsupported character.
 
+    line : int
+        Stores the current line number in the source input.
+
+    column : int
+        Stores the current column position in the current line.
+
+    token_column : int
+        Stores the starting column of the token currently being built.
+
     tokens : list[Token]
-        Stores all completed tokens.
+        Stores all completed Token objects.
 
     Methods:
     --------
     process_char(check)
-        Processes one source character and updates the current lexer state.
+        Processes one source character and updates the lexer state and
+        source position.
 
     finalize()
         Finalizes any unfinished token remaining at the end of the source.
@@ -84,13 +97,16 @@ class Lexer:
         self.word: str = ""
         self.symbols: str = ""
         self.unknown: str = ""
+        self.line: int = 1
+        self.column: int = 1
+        self.token_column: int = 1
         self.tokens: list[Token] = []
 
     def process_char(self, check: str) -> None:
         self.source_memory: str = check
 
         while self.source_memory:
-            consumed: ProcessResult = "RETRY"
+            consumed: ProcessResult = ProcessResult.RETRY
 
             if self.word != "":
                 consumed = self._process_word(check)
@@ -103,79 +119,99 @@ class Lexer:
 
             else:
                 if check.isalpha():
+                    self.token_column = self.column
+                    self.column += 1
                     self.word += check
                     self.source_memory = ""
                     return
                 
                 if check.isdigit():
+                    self.token_column = self.column
+                    self.column += 1
                     self.number += check
                     self.source_memory = ""
                     return
                 
                 if check == " ":
+                    self.column += 1
                     self.source_memory = ""
                     return
-                    
+
+                if check == "\n":
+                    self.column = 1
+                    self.line += 1
+                    self.source_memory = ""
+                    return
+
+                self.token_column = self.column    
+                self.column += 1
                 self.unknown += check
-                self.tokens.append(("UNKNOWN", self.unknown))
+                self._add_token(TokenType.UNKNOWN, self.unknown)
                 self.unknown = ""
                 self.source_memory = ""
                 return
 
-            if consumed == "CONSUMED":
+            if consumed == ProcessResult.CONSUMED:
+                self.column += 1
                 self.source_memory = ""
 
     def finalize(self) -> None:
         if self.number != "":
-            self.tokens.append(("NUMBER", self.number))
+            self._add_token(TokenType.NUMBER, self.number)
             self.number = ""
 
         if self.word != "":
-            token_type = self._check_keyword(self.word)
-            self.tokens.append((token_type, self.word))
+            token_type: TokenType = self._check_keyword(self.word)
+            self._add_token(token_type, self.word)
             self.word = ""
 
         if self.symbols != "":
-            self.tokens.append(("SYMBOL", self.symbols))
+            self._add_token(TokenType.SYMBOL, self.symbols)
             self.symbols = ""
 
-    def _check_keyword(self, check: str) -> WordType:
-        if check in self.config.KEYWORDS:
-            return "KEYWORD"
+    def _add_token(self, token_type: TokenType, value: str) -> None:
+        self.tokens.append(
+            Token(token_type, value, self.line, self.token_column)
+        )
 
-        return "IDENTIFIER"
+    def _check_keyword(self, check: str) -> TokenType:
+        if check in self.config.KEYWORDS:
+            return TokenType.KEYWORD
+
+        return TokenType.IDENTIFIER
 
     def _process_word(self, check: str) -> ProcessResult:
         if check.isalnum():
             self.word += check
-            return "CONSUMED"
+            return ProcessResult.CONSUMED
         
-        token_type: WordType = self._check_keyword(self.word)
-        self.tokens.append((token_type, self.word))
+        token_type: TokenType = self._check_keyword(self.word)
+        self._add_token(token_type, self.word)
         self.word = ""
-        return "RETRY"
+        return ProcessResult.RETRY
 
     def _process_number(self, check: str) -> ProcessResult:
         if check.isdigit():
             self.number += check
-            return "CONSUMED"
+            return ProcessResult.CONSUMED
         
-        self.tokens.append(("NUMBER", self.number))
+        self._add_token(TokenType.NUMBER, self.number)
         self.number = ""
-        return "RETRY"
+        return ProcessResult.RETRY
 
     def _process_symbol(self, check: str) -> ProcessResult:
         if self.symbols == "":
+            self.token_column = self.column
             self.symbols += check
-            return "CONSUMED"
+            return ProcessResult.CONSUMED
 
         candidate = self.symbols + check
 
         if candidate in self.config.MULTI_SYMBOLS:
-            self.tokens.append(("MULTI_SYMBOLS", candidate))
+            self._add_token(TokenType.MULTI_SYMBOLS, candidate)
             self.symbols = ""
-            return "CONSUMED"
+            return ProcessResult.CONSUMED
 
-        self.tokens.append(("SYMBOL", self.symbols))
+        self._add_token(TokenType.SYMBOL, self.symbols)
         self.symbols = ""
-        return "RETRY"
+        return ProcessResult.RETRY

@@ -2,25 +2,27 @@
 # Licensed under the MIT License.
 # See the LICENSE file for details.
 
-from typing import Literal
+from enum import Enum
 
-WordType = Literal[
-    "KEYWORD", 
-    "IDENTIFIER"
-]
+class TokenType(Enum):
 
-TokenType = Literal[
-    "NUMBER",
-    "KEYWORD",
-    "IDENTIFIER",
-    "SYMBOL",
-    "MULTI_SYMBOLS",
-    "UNKNOWN",
-]
+    """
+    Represents the types of tokens produced by the lexer.
+    """
 
-Token = tuple[TokenType, str]
+    NUMBER = "NUMBER"
+    KEYWORD = "KEYWORD"
+    IDENTIFIER = "IDENTIFIER"
+    SYMBOL = "SYMBOL"
+    MULTI_SYMBOLS = "MULTI_SYMBOLS"
+    UNKNOWN = "UNKNOWN"
 
-ProcessResult = Literal[
-    "CONSUMED",
-    "RETRY",
-]
+class ProcessResult(Enum):
+
+    """
+    Represents whether the current source character was consumed
+    or should be processed again.
+    """
+
+    CONSUMED = "CONSUMED"
+    RETRY = "RETRY"

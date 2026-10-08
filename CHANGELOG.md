@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.0.6] - 2026-10-09
+
+### Added
+
+- Added `Token.py` with a `Token` class to store token type, value, line number, and starting column.
+- Added `Token.__repr__()` to display token details, including source position.
+- Added source position tracking using `line`, `column`, and `token_column`, with line and column numbers starting at 1.
+- Added `_add_token()` to centralize token creation and storage.
+
+### Changed
+
+- Replaced tuple-based tokens with `Token` objects in `Lexer.tokens`.
+- Changed `TokenType` and `ProcessResult` from `Literal` type aliases to `Enum` classes.
+- Updated token classification and processing methods to use enum members instead of string values.
+- Changed `_check_keyword()` to return `TokenType` instead of the `WordType` type alias.
+- Updated `process_char()` to handle `\n` as a line break, increment the line number, and reset the column to 1 without generating an `UNKNOWN` token.
+- Updated the `Lexer` class docstring to document source position tracking and `Token` objects.
+
+### Removed
+
+- Removed the `WordType` type alias from `token_types.py`.
+- Removed the tuple-based `Token` type alias from `token_types.py`.
+
 ## [0.0.5] - 2026-10-08
 
 ### Added
