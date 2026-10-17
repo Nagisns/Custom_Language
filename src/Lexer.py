@@ -10,37 +10,47 @@ from token_types import (
     ProcessResult,
 )
 
-
 class Lexer:
     """
-    Tokenize source code using character-by-character lexical analysis.
+    Tokenize ASCII source code one character at a time.
 
-    The lexer processes individual characters and groups them into tokens
-    according to the provided LexerConfig.
+    Call process_char() for each source character, then finalize() to emit
+    any buffered token. Completed tokens are appended to tokens in source
+    order according to the provided LexerConfig.
 
     It maintains internal buffers for numbers, words, and symbols.
     When a character cannot be included in the current token, the lexer
     finalizes that token and reprocesses the character.
 
-    The lexer tracks line and column positions, recording the starting
-    position of each completed token.
+    Token positions use one-based line and column numbers. ASCII whitespace
+    separates tokens without producing a token. Only a newline (LF) advances
+    the line and resets the column to 1; other whitespace, including tabs
+    and carriage returns, advances the column by one character.
 
     Supported token types:
-        NUMBER: A sequence of numeric digits.
-        KEYWORD: A reserved word defined in the configuration.
-        IDENTIFIER: A name beginning with a letter, followed by
-            letters or digits.
+        NUMBER: A sequence of ASCII digits (0-9).
+        KEYWORD: An alphanumeric word beginning with an ASCII letter
+            that exactly matches a configured keyword.
+        IDENTIFIER: An ASCII letter followed by zero or more ASCII letters
+            or digits, excluding configured keywords. Underscores are
+            not part of identifiers.
         SYMBOL: A supported single-character symbol.
-        MULTI_SYMBOLS: A supported two-character symbol.
-        UNKNOWN: An unsupported or unrecognized character.
+        MULTI_SYMBOLS: A configured two-character symbol whose first
+            character is also in config.SYMBOLS.
+        UNKNOWN: An ASCII character that is neither alphanumeric,
+            whitespace, nor a configured symbol.
+
+    Non-ASCII input is rejected with SyntaxError rather than emitted as
+    an UNKNOWN token.
 
     Attributes:
         config (LexerConfig): Configuration containing supported keywords
             and symbols.
-        source_memory (str): Stores the character currently being processed.
+        source_memory (str): Character awaiting consumption, or an empty
+            string when no character is pending.
         number (str): Buffer for the current numeric token.
         word (str): Buffer for the current keyword or identifier.
-        symbols (str): Buffer for a pending symbol.
+        symbols (str): Buffer for a pending single-character symbol.
         line (int): Current line number, starting at 1.
         column (int): Current column number, starting at 1.
         token_column (int): Starting column of the current token.
@@ -60,7 +70,9 @@ class Lexer:
 
     def process_char(self, check: str) -> None:
         """
-        Process a source character and update the lexer state.
+        Process exactly one ASCII source character and update the state.
+
+        Input is validated before any lexer state is changed.
 
         The character is classified according to the current buffer
         and the configured token rules.
@@ -68,12 +80,32 @@ class Lexer:
         If a pending token cannot accept the character, that token
         is finalized and the character is processed again.
 
-        Spaces are ignored, while newline characters increment
-        the line number and reset the column position.
+        ASCII whitespace is skipped after finalizing any pending token.
+        A newline (LF) increments the line number and resets the column to 1.
+        Every other consumed character advances the column by one,
+        including tabs and carriage returns.
 
         Args:
-            check (str): A single source character to process.
+            check (str): A single ASCII source character to process.
+
+        Raises:
+            TypeError: If check is not a str.
+            ValueError: If check does not contain exactly one character.
+            SyntaxError: If check is non-ASCII. The error message includes
+                the current line and column.
         """
+        if not isinstance(check, str):
+            raise TypeError(f"Expected str, got {type(check).__name__}")
+
+        if len(check) != 1:
+            raise ValueError("Expected exactly one character")
+
+        if not check.isascii():
+            raise SyntaxError(
+                f"Non-ASCII character {check!r} "
+                f"at line {self.line}, column {self.column}"
+            )
+        
         self.source_memory: str = check
 
         while self.source_memory:
@@ -97,14 +129,14 @@ class Lexer:
                     self.token_column = self.column
                     consumed = self._process_number(check)
 
-                elif check == " ":
-                    consumed = ProcessResult.CONSUMED
-
                 elif check == "\n":
                     self.column = 1
                     self.line += 1
                     self.source_memory = ""
                     return
+
+                elif check.isspace():
+                    consumed = ProcessResult.CONSUMED
 
                 else:
                     self.token_column = self.column
@@ -122,8 +154,13 @@ class Lexer:
         This method should be called after all source characters
         have been processed.
 
-        Pending numbers, words, and symbols are converted into
-        tokens and their corresponding buffers are cleared.
+        Pending numbers become NUMBER tokens, words become KEYWORD or
+        IDENTIFIER tokens, and a pending single-character symbol becomes
+        a SYMBOL token. Each corresponding buffer is then cleared.
+
+        Existing tokens and source positions are preserved. Repeated calls
+        without new input have no effect, and process_char() can be called
+        again to continue from the current position.
         """
         if self.number != "":
             self._add_token(TokenType.NUMBER, self.number)

@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.0.8] - 2026-10-17
+
+### Added
+
+- Added input type validation to `process_char()` to raise `TypeError` for non-string inputs.
+- Added input length validation to `process_char()` to raise `ValueError` when the input does not contain exactly one character.
+- Added ASCII validation to `process_char()` to raise `SyntaxError` for non-ASCII characters, including the character, line number, and column in the error message.
+- Added `tests/test_lexer.py` with automated tests for tokenization, source positions, input validation, whitespace handling, and token finalization.
+- Added stress tests for long tokens and frequent state transitions, and randomized ASCII tests for source reconstruction and token positions.
+- Added `pyproject.toml` with pytest configuration for the `src` import path and `tests` directory.
+
+### Changed
+
+- Updated `process_char()` to use `str.isspace()` instead of checking only literal spaces, allowing tabs, carriage returns, and other ASCII whitespace to be skipped.
+- Updated `process_char()` to handle `\n` before checking other whitespace.
+- Updated the `Lexer` class docstring to document ASCII-only tokenization, token recognition rules, internal buffers, and whitespace handling.
+- Updated the `process_char()` docstring to document input validation, raised exceptions, and column advancement.
+- Updated the `finalize()` docstring to clarify token classification, repeated calls, and continued input processing.
+- Updated `README.md` to document ASCII input restrictions, whitespace handling, and automated lexer tests.
+- Updated the current version in `README.md` to `v0.0.8`.
+
 ## [0.0.7] - 2026-10-17
 
 ### Added
