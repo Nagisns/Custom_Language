@@ -6,7 +6,7 @@ This project aims to create a language with strict static type checking while ke
 
 ## Status
 
-Current version: `v0.0.6`
+Current version: `v0.0.7`
 
 A class-based stateful lexer has been implemented with separate modules for lexer logic, configuration, token representation, and type definitions. The lexer now tracks source positions and stores generated tokens as objects.
 

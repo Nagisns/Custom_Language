@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.0.7] - 2026-10-17
+
+### Added
+
+- Added docstrings to `Lexer.__init__()`, `process_char()`, and `finalize()` to document initialization, character processing, and end-of-input handling.
+- Added an explicit `str` type annotation to the multi-character symbol candidate in `_process_symbol()`.
+
+### Changed
+
+- Refactored `process_char()` to use `_process_word()` and `_process_number()` when starting new word and number tokens.
+- Centralized column advancement and clearing of `source_memory` in the shared `ProcessResult.CONSUMED` handling for all characters except newlines.
+- Simplified unsupported-character handling by passing the current character directly to `_add_token()` when creating an `UNKNOWN` token.
+- Reorganized the `Lexer` class docstring to clarify token types, internal buffers, character reprocessing, and source position tracking.
+
+### Removed
+
+- Removed the temporary `unknown` buffer from `Lexer`.
+
 ## [0.0.6] - 2026-10-09
 
 ### Added

@@ -1,3 +1,4 @@
+
 # Copyright (c) 2026 Nagi(Nagisns)
 # Licensed under the MIT License.
 # See the LICENSE file for details.
@@ -9,85 +10,41 @@ from token_types import (
     ProcessResult,
 )
 
+
 class Lexer:
-
     """
-    Tokenizes source code one character at a time.
+    Tokenize source code using character-by-character lexical analysis.
 
-    The lexer keeps track of the current token being built and classifies
-    source characters into numbers, keywords, identifiers, symbols,
-    multi-character symbols, and unknown tokens.
+    The lexer processes individual characters and groups them into tokens
+    according to the provided LexerConfig.
 
-    The lexer also tracks the current line and column position in the source
-    and stores the starting column of each token when it is created.
+    It maintains internal buffers for numbers, words, and symbols.
+    When a character cannot be included in the current token, the lexer
+    finalizes that token and reprocesses the character.
 
-    Token types:
-    ------------
-    * NUMBER
-        A sequence of numeric characters.
+    The lexer tracks line and column positions, recording the starting
+    position of each completed token.
 
-    * KEYWORD
-        A reserved word defined in the lexer configuration.
-
-    * IDENTIFIER
-        A user-defined name that starts with a letter and may contain
-        letters or digits.
-
-    * SYMBOL
-        A supported single-character symbol defined in the lexer configuration.
-        A symbol may be temporarily stored while the lexer checks whether
-        it forms a multi-character symbol with the next character.
-
-    * MULTI_SYMBOLS
-        A supported multi-character symbol defined in the lexer configuration.
-
-    * UNKNOWN
-        A character that does not match any supported token type.
+    Supported token types:
+        NUMBER: A sequence of numeric digits.
+        KEYWORD: A reserved word defined in the configuration.
+        IDENTIFIER: A name beginning with a letter, followed by
+            letters or digits.
+        SYMBOL: A supported single-character symbol.
+        MULTI_SYMBOLS: A supported two-character symbol.
+        UNKNOWN: An unsupported or unrecognized character.
 
     Attributes:
-    -----------
-    config : LexerConfig
-        Stores the lexer configuration, including supported keywords,
-        symbols, and multi-character symbols.
-
-    source_memory : str
-        Temporarily stores the current character until it has been fully
-        processed.
-
-    number : str
-        Stores the NUMBER token currently being built.
-
-    word : str
-        Stores the word currently being built before it is classified as
-        KEYWORD or IDENTIFIER.
-
-    symbols : str
-        Temporarily stores a symbol while checking whether it forms a
-        multi-character symbol with the next character.
-
-    unknown : str
-        Temporarily stores an unsupported character.
-
-    line : int
-        Stores the current line number in the source input.
-
-    column : int
-        Stores the current column position in the current line.
-
-    token_column : int
-        Stores the starting column of the token currently being built.
-
-    tokens : list[Token]
-        Stores all completed Token objects.
-
-    Methods:
-    --------
-    process_char(check)
-        Processes one source character and updates the lexer state and
-        source position.
-
-    finalize()
-        Finalizes any unfinished token remaining at the end of the source.
+        config (LexerConfig): Configuration containing supported keywords
+            and symbols.
+        source_memory (str): Stores the character currently being processed.
+        number (str): Buffer for the current numeric token.
+        word (str): Buffer for the current keyword or identifier.
+        symbols (str): Buffer for a pending symbol.
+        line (int): Current line number, starting at 1.
+        column (int): Current column number, starting at 1.
+        token_column (int): Starting column of the current token.
+        tokens (list[Token]): Collection of completed tokens.
     """
 
     def __init__(self, config: LexerConfig) -> None:
@@ -96,13 +53,27 @@ class Lexer:
         self.number: str = ""
         self.word: str = ""
         self.symbols: str = ""
-        self.unknown: str = ""
         self.line: int = 1
         self.column: int = 1
         self.token_column: int = 1
         self.tokens: list[Token] = []
 
     def process_char(self, check: str) -> None:
+        """
+        Process a source character and update the lexer state.
+
+        The character is classified according to the current buffer
+        and the configured token rules.
+
+        If a pending token cannot accept the character, that token
+        is finalized and the character is processed again.
+
+        Spaces are ignored, while newline characters increment
+        the line number and reset the column position.
+
+        Args:
+            check (str): A single source character to process.
+        """
         self.source_memory: str = check
 
         while self.source_memory:
@@ -120,42 +91,40 @@ class Lexer:
             else:
                 if check.isalpha():
                     self.token_column = self.column
-                    self.column += 1
-                    self.word += check
-                    self.source_memory = ""
-                    return
-                
-                if check.isdigit():
-                    self.token_column = self.column
-                    self.column += 1
-                    self.number += check
-                    self.source_memory = ""
-                    return
-                
-                if check == " ":
-                    self.column += 1
-                    self.source_memory = ""
-                    return
+                    consumed = self._process_word(check)
 
-                if check == "\n":
+                elif check.isdigit():
+                    self.token_column = self.column
+                    consumed = self._process_number(check)
+
+                elif check == " ":
+                    consumed = ProcessResult.CONSUMED
+
+                elif check == "\n":
                     self.column = 1
                     self.line += 1
                     self.source_memory = ""
                     return
 
-                self.token_column = self.column    
-                self.column += 1
-                self.unknown += check
-                self._add_token(TokenType.UNKNOWN, self.unknown)
-                self.unknown = ""
-                self.source_memory = ""
-                return
+                else:
+                    self.token_column = self.column
+                    self._add_token(TokenType.UNKNOWN, check)
+                    consumed = ProcessResult.CONSUMED
 
             if consumed == ProcessResult.CONSUMED:
                 self.column += 1
                 self.source_memory = ""
 
     def finalize(self) -> None:
+        """
+        Finalize any unfinished tokens remaining in the buffers.
+
+        This method should be called after all source characters
+        have been processed.
+
+        Pending numbers, words, and symbols are converted into
+        tokens and their corresponding buffers are cleared.
+        """
         if self.number != "":
             self._add_token(TokenType.NUMBER, self.number)
             self.number = ""
@@ -184,7 +153,7 @@ class Lexer:
         if check.isalnum():
             self.word += check
             return ProcessResult.CONSUMED
-        
+
         token_type: TokenType = self._check_keyword(self.word)
         self._add_token(token_type, self.word)
         self.word = ""
@@ -194,7 +163,7 @@ class Lexer:
         if check.isdigit():
             self.number += check
             return ProcessResult.CONSUMED
-        
+
         self._add_token(TokenType.NUMBER, self.number)
         self.number = ""
         return ProcessResult.RETRY
@@ -205,7 +174,7 @@ class Lexer:
             self.symbols += check
             return ProcessResult.CONSUMED
 
-        candidate = self.symbols + check
+        candidate: str = self.symbols + check
 
         if candidate in self.config.MULTI_SYMBOLS:
             self._add_token(TokenType.MULTI_SYMBOLS, candidate)
