@@ -1,4 +1,3 @@
-
 # Copyright (c) 2026 Nagi(Nagisns)
 # Licensed under the MIT License.
 # See the LICENSE file for details.
@@ -15,17 +14,24 @@ class Lexer:
     Tokenize ASCII source code one character at a time.
 
     Call process_char() for each source character, then finalize() to emit
-    any buffered token. Completed tokens are appended to tokens in source
-    order according to the provided LexerConfig.
+    pending number, word, or single-character symbol tokens. String tokens
+    are emitted when their closing double quote is read. Completed tokens
+    are appended to tokens in source order according to the LexerConfig.
 
-    It maintains internal buffers for numbers, words, and symbols.
-    When a character cannot be included in the current token, the lexer
-    finalizes that token and reprocesses the character.
+    It maintains internal buffers for numbers, words, symbols, and strings.
+    Outside strings, when a character cannot be included in the current
+    token, the lexer finalizes that token and reprocesses the character.
 
-    Token positions use one-based line and column numbers. ASCII whitespace
-    separates tokens without producing a token. Only a newline (LF) advances
-    the line and resets the column to 1; other whitespace, including tabs
-    and carriage returns, advances the column by one character.
+    Token positions use one-based line and column numbers. Outside strings,
+    ASCII whitespace separates tokens without producing a token. A newline
+    (LF) outside a string advances the line and resets the column to 1;
+    every other consumed character advances the column by one.
+
+    String token positions point to the opening double quote. String content,
+    including ASCII whitespace, is preserved without escape processing.
+    Embedded LF characters do not advance the line or reset the column, so
+    position tracking for multiline strings and subsequent tokens is not
+    supported. Unterminated strings remain buffered without an error.
 
     Supported token types:
         NUMBER: A sequence of ASCII digits (0-9).
@@ -35,10 +41,11 @@ class Lexer:
             or digits, excluding configured keywords. Underscores are
             not part of identifiers.
         SYMBOL: A supported single-character symbol.
+        STRING: Contents of a double-quoted string, excluding the surrounding
+            quotes. Empty strings are supported.
         MULTI_SYMBOLS: A configured two-character symbol whose first
             character is also in config.SYMBOLS.
-        UNKNOWN: An ASCII character that is neither alphanumeric,
-            whitespace, nor a configured symbol.
+        UNKNOWN: An otherwise unrecognized ASCII character outside a string.
 
     Non-ASCII input is rejected with SyntaxError rather than emitted as
     an UNKNOWN token.
@@ -51,6 +58,10 @@ class Lexer:
         number (str): Buffer for the current numeric token.
         word (str): Buffer for the current keyword or identifier.
         symbols (str): Buffer for a pending single-character symbol.
+        string (str): Buffer for string content, excluding the surrounding
+            double quotes.
+        in_string (bool): Whether an opening double quote has been read
+            without a matching closing double quote.
         line (int): Current line number, starting at 1.
         column (int): Current column number, starting at 1.
         token_column (int): Starting column of the current token.
@@ -63,6 +74,8 @@ class Lexer:
         self.number: str = ""
         self.word: str = ""
         self.symbols: str = ""
+        self.string: str = ""
+        self.in_string: bool = False
         self.line: int = 1
         self.column: int = 1
         self.token_column: int = 1
@@ -80,10 +93,16 @@ class Lexer:
         If a pending token cannot accept the character, that token
         is finalized and the character is processed again.
 
-        ASCII whitespace is skipped after finalizing any pending token.
-        A newline (LF) increments the line number and resets the column to 1.
-        Every other consumed character advances the column by one,
-        including tabs and carriage returns.
+        Inside a string, characters other than the closing double quote
+        are appended unchanged to the string buffer. The closing quote
+        emits a STRING token and clears the string buffer and state.
+        Escape sequences are not interpreted.
+
+        Outside strings, ASCII whitespace is skipped after finalizing any
+        pending token. A newline (LF) outside a string increments the line
+        number and resets the column to 1. Every other consumed character
+        advances the column by one, including tabs, carriage returns, and
+        LF characters inside strings.
 
         Args:
             check (str): A single ASCII source character to process.
@@ -105,13 +124,16 @@ class Lexer:
                 f"Non-ASCII character {check!r} "
                 f"at line {self.line}, column {self.column}"
             )
-        
+
         self.source_memory: str = check
 
         while self.source_memory:
             consumed: ProcessResult = ProcessResult.RETRY
 
-            if self.word != "":
+            if self.in_string:
+                consumed = self._process_string(check)
+
+            elif self.word != "":
                 consumed = self._process_word(check)
 
             elif self.number != "":
@@ -119,6 +141,9 @@ class Lexer:
 
             elif check in self.config.SYMBOLS or self.symbols != "":
                 consumed = self._process_symbol(check)
+
+            elif check == '"':
+                consumed = self._process_string(check)
 
             else:
                 if check.isalpha():
@@ -149,7 +174,7 @@ class Lexer:
 
     def finalize(self) -> None:
         """
-        Finalize any unfinished tokens remaining in the buffers.
+        Emit pending number, word, or single-character symbol tokens.
 
         This method should be called after all source characters
         have been processed.
@@ -157,6 +182,10 @@ class Lexer:
         Pending numbers become NUMBER tokens, words become KEYWORD or
         IDENTIFIER tokens, and a pending single-character symbol becomes
         a SYMBOL token. Each corresponding buffer is then cleared.
+
+        String tokens are emitted by process_char() when a closing double
+        quote is read. An unterminated string's buffer and state are
+        preserved: no STRING token is emitted and no exception is raised.
 
         Existing tokens and source positions are preserved. Repeated calls
         without new input have no effect, and process_char() can be called
@@ -221,3 +250,18 @@ class Lexer:
         self._add_token(TokenType.SYMBOL, self.symbols)
         self.symbols = ""
         return ProcessResult.RETRY
+
+    def _process_string(self, check: str) -> ProcessResult:
+        if not self.in_string:
+            self.token_column = self.column
+            self.in_string = True
+
+        elif check == '"':
+            self._add_token(TokenType.STRING, self.string)
+            self.string = ""
+            self.in_string = False
+
+        else:
+            self.string += check
+
+        return ProcessResult.CONSUMED

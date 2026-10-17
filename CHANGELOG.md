@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.0.9] - 2026-10-18
+
+### Added
+
+- Added the `STRING` token type for double-quoted string literals.
+- Added `_process_string()` with a string buffer and state tracking to recognize opening and closing double quotes.
+- Added support for empty strings and adjacent string literals, storing token values without the surrounding quotes.
+- Added tests for string values, token positions, transitions between strings and other token types, state reset, repeated finalization, and independent lexer instances.
+- Added tests for preserving ASCII whitespace and rejecting non-ASCII characters inside strings.
+- Added randomized tests covering 500 valid strings and their surrounding tokens.
+
+### Changed
+
+- Updated `process_char()` to prioritize active string processing, preserving symbols, keywords, and whitespace inside strings as literal content.
+- Updated the existing randomized ASCII tests to exclude double quotes, keeping source reconstruction checks separate from string token tests.
+
 ## [0.0.8] - 2026-10-17
 
 ### Added

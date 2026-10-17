@@ -28,11 +28,6 @@ def snapshot(source: str):
     ]
 
 
-# ==========================================
-# Basic Lexer Tests
-# ==========================================
-
-
 # 1. Empty input
 def test_empty_source():
     assert tokenize("") == []
@@ -196,11 +191,6 @@ def test_independent_instances():
 
     assert first.tokens[0].value == "a"
     assert second.tokens[0].value == "b"
-
-
-# ==========================================
-# Advanced Lexer Stress Tests
-# ==========================================
 
 
 # 16. CRLF line endings
@@ -428,14 +418,16 @@ def test_token_location_integrity():
         assert source[start:end] == token.value
 
 
-# 34. Random ASCII fuzzing
-def test_random_ascii_fuzzing():
+# 34. Random ASCII fuzzing (without string delimiters)
+def test_random_ascii_fuzzing_without_string_delimiters():
     rng = random.Random(20261017)
 
     alphabet = (
         string.ascii_letters
         + string.digits
-        + string.punctuation
+        # STRING tokens intentionally omit their surrounding double quotes.
+        # Keep this original reconstruction invariant for quote-free input.
+        + string.punctuation.replace('"', "")
         + " \t\r\n"
     )
 
@@ -472,5 +464,207 @@ def test_random_ascii_fuzzing():
             assert line[start:end] == token.value, (
                 f"Invalid token position: {token!r}"
             )
+
+
+# 35. Basic double-quoted string
+@pytest.mark.parametrize("source, expected", [
+    ('"Hello"', "Hello"),
+    ('"Hello, World!"', "Hello, World!"),
+    ('"123"', "123"),
+])
+def test_basic_string(source, expected):
+    assert snapshot(source) == [
+        (TokenType.STRING, expected, 1, 1),
+    ]
+
+
+# 36. Empty STRING must still produce a token
+def test_empty_string():
+    assert snapshot('""') == [
+        (TokenType.STRING, "", 1, 1),
+    ]
+
+
+# 37. Adjacent STRINGs without separators
+def test_adjacent_strings():
+    assert snapshot('"a""bc"""') == [
+        (TokenType.STRING, "a", 1, 1),
+        (TokenType.STRING, "bc", 1, 4),
+        (TokenType.STRING, "", 1, 8),
+    ]
+
+
+# 38. STRING after a pending SYMBOL and a KEYWORD
+def test_string_after_assignment():
+    assert snapshot('let x="hello"') == [
+        (TokenType.KEYWORD, "let", 1, 1),
+        (TokenType.IDENTIFIER, "x", 1, 5),
+        (TokenType.SYMBOL, "=", 1, 6),
+        (TokenType.STRING, "hello", 1, 7),
+    ]
+
+
+# 39. RETRY when a pending identifier encounters a quote
+def test_string_between_identifiers():
+    assert snapshot('before"middle"after') == [
+        (TokenType.IDENTIFIER, "before", 1, 1),
+        (TokenType.STRING, "middle", 1, 7),
+        (TokenType.IDENTIFIER, "after", 1, 15),
+    ]
+
+
+# 40. RETRY when a pending number encounters a quote
+def test_string_between_numbers():
+    assert snapshot('123"abc"456') == [
+        (TokenType.NUMBER, "123", 1, 1),
+        (TokenType.STRING, "abc", 1, 4),
+        (TokenType.NUMBER, "456", 1, 9),
+    ]
+
+
+# 41. Operators and unknown punctuation inside a STRING are literal
+@pytest.mark.parametrize("content", [
+    "a+b==c",
+    "a!=b += 10",
+    "@#$%&/",
+    "let x = 123",
+    "'single quotes'",
+])
+def test_string_contains_uninterpreted_characters(content):
+    assert snapshot('"' + content + '"') == [
+        (TokenType.STRING, content, 1, 1),
+    ]
+
+
+# 42. ASCII whitespace inside a STRING is preserved
+def test_string_preserves_ascii_whitespace():
+    value = " a\tb\rc "
+    assert snapshot('"' + value + '"') == [
+        (TokenType.STRING, value, 1, 1),
+    ]
+
+
+# 43. Position tracking after a closed STRING
+def test_string_followed_by_operator():
+    assert snapshot('"abc"+5') == [
+        (TokenType.STRING, "abc", 1, 1),
+        (TokenType.SYMBOL, "+", 1, 6),
+        (TokenType.NUMBER, "5", 1, 7),
+    ]
+
+
+# 44. STRING positions across newlines outside strings
+def test_string_positions_across_lines():
+    assert snapshot('x\n  "hello"\n"world"') == [
+        (TokenType.IDENTIFIER, "x", 1, 1),
+        (TokenType.STRING, "hello", 2, 3),
+        (TokenType.STRING, "world", 3, 1),
+    ]
+
+
+# 45. A configured multi-character symbol before a STRING
+def test_multi_symbol_before_string():
+    assert snapshot('x+="hello"') == [
+        (TokenType.IDENTIFIER, "x", 1, 1),
+        (TokenType.MULTI_SYMBOLS, "+=", 1, 2),
+        (TokenType.STRING, "hello", 1, 4),
+    ]
+
+
+# 46. Repeated finalize calls must not duplicate STRING tokens
+def test_string_finalize_idempotency():
+    lexer = Lexer(LexerConfig())
+
+    for char in '"hello"':
+        lexer.process_char(char)
+
+    lexer.finalize()
+    lexer.finalize()
+
+    assert len(lexer.tokens) == 1
+    assert lexer.tokens[0].token_type == TokenType.STRING
+    assert lexer.tokens[0].value == "hello"
+
+
+# 47. STRING buffers and state must reset after a closing quote
+def test_string_state_reset():
+    lexer = Lexer(LexerConfig())
+
+    for char in '"a"':
+        lexer.process_char(char)
+
+    assert lexer.in_string is False
+    assert lexer.string == ""
+
+    for char in '"b"':
+        lexer.process_char(char)
+
+    lexer.finalize()
+    assert [token.value for token in lexer.tokens] == ["a", "b"]
+
+
+# 48. STRING state must not leak between Lexer instances
+def test_string_independent_instances():
+    first = Lexer(LexerConfig())
+    second = Lexer(LexerConfig())
+
+    for char in '"abc':
+        first.process_char(char)
+
+    for char in '"xyz"':
+        second.process_char(char)
+
+    first.process_char('"')
+    first.finalize()
+    second.finalize()
+
+    assert first.tokens[0].value == "abc"
+    assert second.tokens[0].value == "xyz"
+
+
+# 49. Non-ASCII characters remain invalid inside STRINGs
+@pytest.mark.parametrize("character", [
+    "é",
+    "\u00a0",
+    "٣",
+    "\u0301",
+])
+def test_non_ascii_inside_string(character):
+    lexer = Lexer(LexerConfig())
+    lexer.process_char('"')
+
+    with pytest.raises(SyntaxError, match="Non-ASCII"):
+        lexer.process_char(character)
+
+    assert lexer.tokens == []
+    assert lexer.in_string is True
+    assert lexer.string == ""
+
+
+# 50. Random valid strings test delimiters, values, and positions
+# No embedded double quotes or LF: escaping and multiline errors are not
+# implemented by the current Lexer.
+def test_random_valid_strings():
+    rng = random.Random(20261017)
+    alphabet = (
+        string.ascii_letters
+        + string.digits
+        + string.punctuation.replace('"', "")
+        + " \t\r"
+    )
+
+    for _ in range(500):
+        content = "".join(
+            rng.choice(alphabet)
+            for _ in range(rng.randint(0, 200))
+        )
+        source = 'x="' + content + '"+10'
+        assert snapshot(source) == [
+            (TokenType.IDENTIFIER, "x", 1, 1),
+            (TokenType.SYMBOL, "=", 1, 2),
+            (TokenType.STRING, content, 1, 3),
+            (TokenType.SYMBOL, "+", 1, len(content) + 5),
+            (TokenType.NUMBER, "10", 1, len(content) + 6),
+        ], f"STRING fuzzing failed: {source!r}"
 
 # Created by ChatGPT
