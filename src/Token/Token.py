@@ -2,7 +2,7 @@
 # Licensed under the MIT License.
 # See the LICENSE file for details.
 
-from token_types import TokenType
+from Token.token_types import TokenType
 
 class Token:
 

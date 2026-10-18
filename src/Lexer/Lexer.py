@@ -2,9 +2,9 @@
 # Licensed under the MIT License.
 # See the LICENSE file for details.
 
-from LexerConfig import LexerConfig
-from Token import Token
-from token_types import (
+from Lexer.LexerConfig import LexerConfig
+from Token.Token import Token
+from Token.token_types import (
     TokenType,
     ProcessResult,
 )

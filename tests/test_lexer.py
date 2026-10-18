@@ -6,9 +6,9 @@ import pytest
 import random
 import string
 
-from Lexer import Lexer
-from LexerConfig import LexerConfig
-from token_types import TokenType
+from Lexer.Lexer import Lexer
+from Lexer.LexerConfig import LexerConfig
+from Token.token_types import TokenType
 
 
 def tokenize(source: str):

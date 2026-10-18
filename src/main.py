@@ -2,8 +2,8 @@
 # Licensed under the MIT License.
 # See the LICENSE file for details.
 
-from Lexer import Lexer
-from LexerConfig import LexerConfig
+from Lexer.Lexer import Lexer
+from Lexer.LexerConfig import LexerConfig
 
 source = "let x = 10 + 5"
 
